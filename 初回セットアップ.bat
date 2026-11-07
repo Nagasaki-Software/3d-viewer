@@ -32,7 +32,9 @@ if errorlevel 1 (
     exit /b 1
 )
 popd
+if not exist "viewer\models" mkdir "viewer\models"
 echo ビューアの準備ができました。
+echo 見せたいモデル（.glb）は viewer\models フォルダに置きます。
 echo.
 
 rem ---------- 2. 変換ツール ----------
