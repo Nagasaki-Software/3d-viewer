@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>3D モデルビューア</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ドロップゾーン（モデル未読込時に表示） -->
+    <div id="drop-zone">
+      <div id="drop-zone-text">
+        <p>GLB / GLTF ファイルをここにドラッグ&amp;ドロップ</p>
+        <p class="drop-zone-hint">アノテーション JSON も同様にドロップできます</p>
+        <div id="model-gallery"></div>
+      </div>
+    </div>
+
+    <!-- タイトル・スペックカード（モデル読込後に表示） -->
+    <div id="model-title" class="info-card hidden"></div>
+    <div id="model-specs" class="info-card hidden"></div>
+
+    <!-- 引出し線SVG（アノテーションオーバーレイの直前） -->
+    <svg id="leader-svg"></svg>
+
+    <!-- アノテーション用オーバーレイ（ラベルHTMLを動的に追加する） -->
+    <div id="annotation-overlay"></div>
+
+    <!-- フローティング UI（右上）。常時表示の主要操作＋折りたたみ式グループの単一カード -->
+    <div id="ui-panel">
+      <div class="ui-panel-primary">
+        <button id="back-to-gallery-btn" class="hidden">モデル一覧に戻る</button>
+        <button id="mode-toggle">編集モードへ</button>
+        <button id="save-btn" class="hidden">保存</button>
+        <button id="add-label-btn" class="hidden">ラベル追加</button>
+      </div>
+
+      <details class="ui-group" open>
+        <summary>標準ビュー</summary>
+        <div id="view-buttons">
+          <button data-view="front">正面</button>
+          <button data-view="back">背面</button>
+          <button data-view="top">上</button>
+          <button data-view="bottom">下</button>
+          <button data-view="left">左</button>
+          <button data-view="right">右</button>
+          <button data-view="iso">等角</button>
+        </div>
+      </details>
+
+      <details class="ui-group" id="manual-controls-group">
+        <summary>ボタンで操作</summary>
+        <p class="manual-controls-hint">ピンチ操作が難しいときに、ボタンで視点を操作できます</p>
+        <div class="manual-controls-section">
+          <p class="manual-controls-label">回転</p>
+          <div class="ui-group-buttons">
+            <button data-action="rotate" data-dir="up" aria-label="上に回転">↑</button>
+            <button data-action="rotate" data-dir="down" aria-label="下に回転">↓</button>
+            <button data-action="rotate" data-dir="left" aria-label="左に回転">←</button>
+            <button data-action="rotate" data-dir="right" aria-label="右に回転">→</button>
+          </div>
+        </div>
+        <div class="manual-controls-section">
+          <p class="manual-controls-label">平行移動</p>
+          <div class="ui-group-buttons">
+            <button data-action="pan" data-dir="up" aria-label="上へ移動">↑</button>
+            <button data-action="pan" data-dir="down" aria-label="下へ移動">↓</button>
+            <button data-action="pan" data-dir="left" aria-label="左へ移動">←</button>
+            <button data-action="pan" data-dir="right" aria-label="右へ移動">→</button>
+          </div>
+        </div>
+        <div class="manual-controls-section">
+          <p class="manual-controls-label">ズーム</p>
+          <div class="ui-group-buttons">
+            <button data-action="zoom" data-dir="in" aria-label="拡大">＋</button>
+            <button data-action="zoom" data-dir="out" aria-label="縮小">－</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="ui-group">
+        <summary>注釈</summary>
+        <div class="ui-group-buttons">
+          <button id="annotation-list-btn">注釈一覧</button>
+        </div>
+      </details>
+
+      <details class="ui-group">
+        <summary>視点ブックマーク</summary>
+        <div class="ui-group-buttons">
+          <button id="bookmark-btn">ビュー保存</button>
+          <button id="bookmark-list-btn">ビュー一覧</button>
+          <button id="pdf-btn">PDF保存</button>
+        </div>
+      </details>
+
+      <details class="ui-group hidden" id="up-axis-group">
+        <summary>モデルの向き</summary>
+        <p class="up-axis-hint">モデルが横向き・逆さまに表示される場合、実際の高さに近い辺を選んでください</p>
+        <div class="ui-group-buttons" id="up-axis-buttons">
+          <button data-axis="x">X軸</button>
+          <button data-axis="y">Y軸</button>
+          <button data-axis="z">Z軸</button>
+        </div>
+      </details>
+
+      <details class="ui-group">
+        <summary>表示設定</summary>
+        <div class="ui-group-buttons">
+          <button id="labels-toggle" class="active">ラベル表示</button>
+          <button id="edge-toggle">エッジ表示</button>
+          <button id="exhibit-toggle">展示モード</button>
+          <button id="theme-toggle">ライトモード</button>
+        </div>
+        <div class="pdf-folder-setting hidden" id="pdf-folder-setting">
+          <label for="pdf-folder">PDF保存先（例: \\fileserver\share\3D記録）</label>
+          <input type="text" id="pdf-folder" />
+          <button id="pdf-folder-save">設定</button>
+        </div>
+        <div class="font-settings">
+          <div class="font-setting">
+            <label for="font-annotation">注釈の文字サイズ <span id="font-annotation-val"></span></label>
+            <input type="range" id="font-annotation" min="10" max="32" step="1" />
+          </div>
+          <div class="font-setting">
+            <label for="font-title">タイトルの文字サイズ <span id="font-title-val"></span></label>
+            <input type="range" id="font-title" min="12" max="40" step="1" />
+          </div>
+          <div class="font-setting">
+            <label for="font-specs">スペックの文字サイズ <span id="font-specs-val"></span></label>
+            <input type="range" id="font-specs" min="8" max="24" step="1" />
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- 注釈一覧パネル（左上） -->
+    <div id="annotation-list" class="hidden"></div>
+
+    <!-- 視点ブックマーク一覧パネル（左下。注釈一覧・UIパネルと重ならないよう別コーナーに配置） -->
+    <div id="bookmark-list" class="hidden"></div>
+
+    <!-- プログレスバー（下部） -->
+    <div id="progress-bar" class="hidden">
+      <div id="progress-fill"></div>
+    </div>
+
+    <!-- エラー・情報メッセージ（下部中央） -->
+    <div id="error-msg" class="hidden"></div>
+
+    <!-- ラベルテキスト入力ダイアログ（中央） -->
+    <div id="label-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="label-dialog-title">
+      <p id="label-dialog-title">ラベルテキストを入力</p>
+      <input type="text" id="label-input" placeholder="例: エンジン部" />
+      <textarea id="label-textarea" class="hidden" rows="5"></textarea>
+      <div class="dialog-actions">
+        <button id="label-confirm">追加</button>
+        <button id="label-cancel">キャンセル</button>
+      </div>
+    </div>
+
+    <!-- PDF保存のメモ入力ダイアログ（中央） -->
+    <div id="pdf-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pdf-dialog-title">
+      <p id="pdf-dialog-title">PDFを保存（メモは空欄でも可）</p>
+      <textarea id="pdf-memo" rows="5" maxlength="500" placeholder="メモ（任意）"></textarea>
+      <div class="dialog-actions">
+        <button id="pdf-confirm">保存</button>
+        <button id="pdf-cancel">キャンセル</button>
+      </div>
+    </div>
+
+    <!-- 部品情報パネル（部品タップ時に表示・右下） -->
+    <div id="part-panel" class="hidden">
+      <p id="part-name"></p>
+      <div class="part-actions">
+        <button id="part-hide">隠す</button>
+        <button id="part-show-all">すべて再表示</button>
+      </div>
+    </div>
+
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

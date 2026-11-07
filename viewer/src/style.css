@@ -1,0 +1,745 @@
+:root {
+  --bg: #111118;
+  --bg-panel: rgba(10, 12, 18, 0.82);
+  --fg: #ffffff;
+  --fg-muted: rgba(255, 255, 255, 0.68);
+  --border: rgba(255, 255, 255, 0.22);
+  --accent: #4fc3f7;
+  --accent-glow: rgba(79, 195, 247, 0.28);
+  --btn-bg: rgba(255, 255, 255, 0.08);
+  --btn-bg-hover: rgba(255, 255, 255, 0.16);
+  --label-bg: rgba(79, 195, 247, 0.92);
+  --label-fg: #062029;
+  --danger: #ff8a8a;
+  --danger-bg: rgba(255, 90, 90, 0.18);
+  --danger-border: rgba(255, 90, 90, 0.4);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --line-shadow: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}
+
+:root[data-theme="light"] {
+  --bg: #f2f3f5;
+  --bg-panel: rgba(255, 255, 255, 0.88);
+  --fg: #1a1a24;
+  --fg-muted: rgba(26, 26, 36, 0.68);
+  --border: rgba(0, 0, 0, 0.16);
+  --accent: #0277bd;
+  --accent-glow: rgba(2, 119, 189, 0.22);
+  --btn-bg: rgba(0, 0, 0, 0.05);
+  --btn-bg-hover: rgba(0, 0, 0, 0.09);
+  --label-bg: rgba(2, 119, 189, 0.92);
+  --label-fg: #ffffff;
+  --danger: #b3261e;
+  --danger-bg: rgba(198, 40, 40, 0.14);
+  --danger-border: rgba(198, 40, 40, 0.4);
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  --line-shadow: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  font-family: "Meiryo UI", Meiryo, sans-serif;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  /* canvasだけtouch-action:noneにしても、UIパネル等（既定はauto）に指が
+     かかった状態のピンチはブラウザのページズームにフォールバックしてしまう。
+     アプリ全体でネイティブジェスチャーを無効にし、
+     縦スクロールが必要なパネルだけ下で個別に許可し直す */
+  touch-action: none;
+}
+
+/* Three.js が挿入する canvas */
+canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none;
+}
+
+/* ドロップゾーン。かすかな図面グリッドで「工学ツール」らしさを出す */
+#drop-zone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  font-size: 22px;
+  z-index: 10;
+  border: 2px dashed var(--border);
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center;
+  opacity: 1;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+#drop-zone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, var(--bg) 75%);
+  pointer-events: none;
+}
+
+#drop-zone-text {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.drop-zone-hint {
+  font-size: 14px;
+  margin-top: 8px;
+  color: var(--fg-muted);
+}
+
+#drop-zone.drag-over {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 引出し線SVG（アノテーションオーバーレイの下地） */
+#leader-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 19;
+  width: 100%;
+  height: 100%;
+}
+
+.leader-line {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  color: var(--accent);
+  filter: var(--line-shadow);
+}
+
+/* アノテーションオーバーレイ */
+#annotation-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.annotation-label {
+  position: absolute;
+  background: var(--label-bg);
+  color: var(--label-fg);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: var(--font-annotation, 14px);
+  font-weight: bold;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* 情報カード（タイトル・スペック） */
+.info-card {
+  position: absolute;
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  z-index: 25;
+  max-width: min(340px, 40vw);
+}
+#model-title {
+  top: 16px;
+  left: 16px;
+  padding: 12px 20px;
+  font-size: var(--font-title, 18px);
+  font-weight: 700;
+  max-width: min(600px, 60vw);
+}
+#model-specs {
+  bottom: 16px;
+  left: 16px;
+  padding: 10px 16px;
+  font-size: var(--font-specs, 12px);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow-y: auto;
+  touch-action: pan-y; /* 縦スクロールは許可しつつピンチズームは無効のまま */
+}
+#model-specs.placeholder { color: var(--fg-muted); }
+
+.info-card.editable {
+  cursor: pointer;
+  outline: 1px dashed var(--accent);
+}
+
+/* ─── フローティング UI パネル（右上）───────────────────────── */
+/* 常時表示の主要操作行＋折りたたみ式グループをまとめた1枚のガラスカード */
+#ui-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 30;
+  width: min(88vw, 300px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  touch-action: pan-y; /* 縦スクロールは許可しつつピンチズームは無効のまま */
+}
+
+.ui-panel-primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#ui-panel button {
+  background: var(--btn-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 44px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+#ui-panel button:hover {
+  background: var(--btn-bg-hover);
+}
+
+#ui-panel button:active {
+  transform: translateY(1px);
+}
+
+#ui-panel button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#ui-panel button.active {
+  background: var(--accent);
+  color: var(--label-fg);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.up-axis-hint {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 4px 4px 8px;
+}
+
+/* 折りたたみグループ（標準ビュー・注釈・視点ブックマーク・表示設定） */
+.ui-group {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.ui-group summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  user-select: none;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.ui-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-group summary:hover {
+  background: var(--btn-bg);
+}
+
+.ui-group summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ui-group summary::after {
+  content: "";
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.ui-group[open] summary::after {
+  transform: rotate(-135deg);
+}
+
+.ui-group-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+/* ボタンによる視点操作（回転・平行移動・ズームの各グループの見出し・注意書き） */
+.manual-controls-hint {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 4px 4px 8px;
+}
+
+.manual-controls-section + .manual-controls-section {
+  margin-top: 8px;
+}
+
+.manual-controls-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 0 4px 4px;
+}
+
+/* サーバー上のモデル一覧（ドロップゾーン内） */
+#model-gallery {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+#model-gallery-heading {
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.model-gallery-item {
+  min-height: 44px;
+  min-width: 260px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.model-gallery-item:hover {
+  background: var(--btn-bg-hover);
+}
+
+/* フォントサイズ設定スライダー */
+.font-settings {
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.font-setting label {
+  display: block;
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-bottom: 4px;
+}
+
+.font-setting input[type="range"] {
+  width: 100%;
+  height: 28px; /* タッチで掴みやすい高さ */
+  accent-color: var(--accent);
+}
+
+/* 標準ビュー7種はコンパクトな4列グリッドに（7段の縦積みを解消） */
+#view-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+}
+
+#view-buttons button {
+  padding: 10px 4px;
+  font-size: 13px;
+}
+
+/* プログレスバー */
+#progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--border);
+  z-index: 35;
+}
+
+#progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.1s;
+}
+
+/* エラー・情報メッセージ（トースト） */
+#error-msg {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-panel);
+  color: var(--fg);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 40;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  animation: toast-in 0.2s ease-out;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ラベル入力ダイアログ */
+#label-dialog,
+#pdf-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  min-width: 300px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  animation: dialog-in 0.15s ease-out;
+}
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+#label-dialog-title,
+#pdf-dialog-title {
+  color: var(--fg-muted);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+#label-input,
+#label-textarea,
+#pdf-memo {
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 10px;
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+#label-input:focus,
+#label-textarea:focus,
+#pdf-memo:focus {
+  border-color: var(--accent);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#label-confirm,
+#pdf-confirm {
+  background: var(--accent);
+  color: var(--label-fg);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 44px;
+  cursor: pointer;
+  flex: 1;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+#label-confirm:hover,
+#pdf-confirm:hover {
+  filter: brightness(1.08);
+}
+
+#label-cancel,
+#pdf-cancel {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 44px;
+  cursor: pointer;
+  flex: 1;
+  transition: background 0.15s, transform 0.1s;
+}
+
+#label-cancel:hover,
+#pdf-cancel:hover {
+  background: var(--btn-bg-hover);
+}
+
+#label-confirm:active,
+#label-cancel:active,
+#pdf-confirm:active,
+#pdf-cancel:active {
+  transform: translateY(1px);
+}
+
+#label-confirm:focus-visible,
+#label-cancel:focus-visible,
+#pdf-confirm:focus-visible,
+#pdf-cancel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 部品情報パネル（右下固定） */
+#part-panel {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  z-index: 30;
+  max-width: min(80vw, 320px);
+}
+
+#part-name {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.part-actions button {
+  flex: 1;
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--btn-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.part-actions button:hover {
+  background: var(--btn-bg-hover);
+}
+
+.part-actions button:active {
+  transform: translateY(1px);
+}
+
+.part-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 注釈一覧パネル（左上。タイトルカードの下に配置） */
+#annotation-list {
+  position: absolute;
+  top: 72px;
+  left: 16px;
+  width: min(80vw, 320px);
+  max-height: 50vh;
+  overflow-y: auto;
+  touch-action: pan-y; /* 縦スクロールは許可しつつピンチズームは無効のまま */
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+.annotation-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.annotation-row button {
+  min-height: 44px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.annotation-row button:first-child {
+  flex: 1;
+  background: var(--btn-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-row button:first-child:hover {
+  background: var(--btn-bg-hover);
+}
+
+.annotation-del {
+  min-width: 44px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  padding: 8px 12px;
+}
+
+.annotation-del:hover {
+  filter: brightness(1.1);
+}
+
+.annotation-row button:active {
+  transform: translateY(1px);
+}
+
+.annotation-row button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 視点ブックマーク一覧パネル（左下。スペックカードの上に配置） */
+#bookmark-list {
+  position: absolute;
+  bottom: 96px;
+  left: 16px;
+  width: min(80vw, 320px);
+  max-height: 50vh;
+  overflow-y: auto;
+  touch-action: pan-y; /* 縦スクロールは許可しつつピンチズームは無効のまま */
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #error-msg,
+  #label-dialog,
+  #pdf-dialog {
+    animation: none;
+  }
+  #ui-panel button,
+  .part-actions button,
+  .annotation-row button,
+  #label-confirm,
+  #pdf-confirm,
+  #pdf-cancel,
+  #label-cancel,
+  .ui-group summary::after {
+    transition: none;
+  }
+}
+
+/* PDF保存先の設定（編集モードのみ表示） */
+.pdf-folder-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.pdf-folder-setting.hidden { display: none; }
+.pdf-folder-setting input {
+  font: inherit;
+  padding: 6px 8px;
+}
