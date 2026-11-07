@@ -299,7 +299,6 @@ function handleJSONDrop(file, handle = null) {
 async function loadFromServer(name) {
   const paths = modelPaths(name);
   showMessage('サーバーからモデルを読み込んでいます…', 8000);
-  const tFetchStart = performance.now();
   let res;
   try {
     res = await fetch(paths.glb);
@@ -312,9 +311,7 @@ async function loadFromServer(name) {
     return;
   }
   const blob = await res.blob();
-  const tAfterFetch = performance.now();
   await handleGLBDrop(new File([blob], `${name}.glb`));
-  const tAfterBuild = performance.now();
   serverModelName = name; // handleGLBDropがリセットするため、その後に設定する
 
   // 同名の注釈JSONがあれば自動で重ねて読み込む
@@ -347,12 +344,6 @@ async function loadFromServer(name) {
 
   // このモデルを指すURLに書き換える（コピーすれば人に共有できる）
   history.replaceState(null, '', `?model=${encodeURIComponent(name)}`);
-
-  // 動作調査用の一時計測: 通信時間と表示準備（解析・組み立て）時間を切り分けて表示する
-  // 注釈読み込み完了メッセージに上書きされないよう少し遅らせて表示する
-  const fetchSec = ((tAfterFetch - tFetchStart) / 1000).toFixed(1);
-  const buildSec = ((tAfterBuild - tAfterFetch) / 1000).toFixed(1);
-  setTimeout(() => showMessage(`読み込み完了（通信 ${fetchSec}秒 / 表示準備 ${buildSec}秒）`, 15000), 800);
 }
 
 async function refreshModelGallery() {

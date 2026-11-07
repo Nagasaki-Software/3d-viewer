@@ -61,6 +61,9 @@ export function requestRender(ms = 100) {
   renderScheduler.request(ms, performance.now());
 }
 
+// 左下の調査用表示（FPS・指の本数・解像度など）を出すか。不具合の切り分けのときだけ true にする
+const SHOW_DIAGNOSTICS = false;
+
 // 操作時の重さがGPU描画由来かどうかを切り分けるための一時的な調査用表示
 let fpsEl = null;
 let fpsFrameCount = 0;
@@ -77,6 +80,7 @@ function initFpsCounter(container) {
 }
 
 function updateFpsCounter() {
+  if (!fpsEl) return;
   fpsFrameCount += 1;
   const now = performance.now();
   const elapsed = now - fpsLastTime;
@@ -161,9 +165,11 @@ export function initViewer(container) {
     document.addEventListener(type, () => requestRender(INPUT_RENDER_MS), { capture: true, passive: true });
   }
 
-  initFpsCounter(container);
-  initPointerCounter(container);
-  initDiagCounter(container);
+  if (SHOW_DIAGNOSTICS) {
+    initFpsCounter(container);
+    initPointerCounter(container);
+    initDiagCounter(container);
+  }
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
