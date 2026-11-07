@@ -1,0 +1,2 @@
+# .bat は Shift-JIS(cp932) + CRLF のまま保存・配布する（改行や文字コードを変換しない）
+*.bat -text
