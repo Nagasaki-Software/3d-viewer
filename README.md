@@ -16,6 +16,8 @@
 |---|---|
 | `converter/` | STEP → 圧縮GLB 変換ツール（Python）。使い方は converter/README.md |
 | `viewer/` | ブラウザで動く3Dビューア（Vite + Three.js） |
+| `docs/manual/` | 取扱説明書（[PDF](docs/manual/取扱説明書.pdf)・[Markdown](docs/manual/取扱説明書.md)） |
+| `samples/` | 試しに見られるサンプルモデル（[ブルドーザー](samples/bulldozer/README.md)） |
 
 ## 必要なもの
 
@@ -32,6 +34,7 @@
 2. **「ビューア起動.bat」をダブルクリック** → ブラウザが自動で開きます
    - 黒い画面は閉じないでください（閉じるとビューアが止まります）
    - 見せたいモデル（`.glb`）は `viewer\models\` に置くと、最初の画面に一覧で出ます。`.glb` をブラウザにドラッグ&ドロップしても開けます
+   - 試しに見るなら、`samples\bulldozer\` の3つの `.glb` を `viewer\models\` にコピーしてください
    - 同じネットワークの他のPCからは、黒い画面の「Network: http://…:4000/」のアドレスで見られます
 3. **「変換ツール起動.bat」をダブルクリック** → STEPファイルを選んで `.glb` に変換します
 
